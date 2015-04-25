@@ -1,0 +1,154 @@
+---
+title: "Pratical Machine Learning Project Writeup"
+author: "Ashish Lakhani"
+date: "Monday, April 20, 2015"
+output: html_document
+---
+
+
+```{r set_global_options, cache=TRUE}
+```
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+library(caret)
+```
+
+##Objective 
+
+In this project ask is to analyze dataset from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. Participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Our goal is to build a machine learning algorithm which predicts how participants did in their excercise which is provided by classe variable in the dataset.
+
+###Getting the data and preliminary inspection
+
+Lets first get the training data from the source URL and store it in a dataframe called pml. 
+
+```{r}
+pml=read.csv("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+dim(pml)
+```
+
+We can determine from the output of dim function that our dataframe has **19622** rows and **160** columns. 
+If you further analyze dataset you will find that there are columns with just NULL values and empty values in them, These columns with NULL or no data are not going to be useful in predicting the outcome of class variable so we can safely remove them before determining our prediction model.
+
+###Data cleanup
+
+```{r}
+pml[pml == ""] <- NA
+pml <- pml[,colSums(is.na(pml))<19216]
+```
+
+Futher observing pml dataset again you will find that first seven columns are also not useful in predicting the classe variable as they are related to user_name and timestamp so we can safely remove them from our dataset. Also assignment asks us use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants for our prediction so we can filter out other remaining columns.
+
+```{r}
+pml=pml[-c(1:7)]
+```
+
+##Cross validation with Training and Test set
+
+Now that we have done basic cleanup we can now create data partition and divide our dataset into training and test datasets for doing cross validation.
+
+```{r}
+set.seed(1212)
+inTrain = createDataPartition(y=pml$classe,p=.7,list=FALSE)
+training = pml[inTrain,]
+testing = pml[-inTrain,]
+```
+
+Within the training dataset we will use kfold function to do cross validation by invoking trainControl function within the  train function.
+
+```{r}
+set.seed(12121)
+trctl = trainControl(method="cv",number=4)
+```
+
+
+##Picking the best model
+
+We can now start applying different models to dataset and use the model which gives us best accuracy or lowest error rate.
+
+### Regression Trees algorithm
+
+First Lets apply trees algorithm to dataset.
+
+```{r}
+modelFit1=train(training$classe ~ .,method="rpart",data=training,trControl=trctl,tuneLength=5)
+```
+
+Lets determine the accuracy/error rate of the model by applying confusion matrix to predicted outcomes v/s observed values in training class.
+
+```{r}
+confusionMatrix(training$classe,predict(modelFit1$finalModel,newdata=training,type="class"))
+```
+
+You can observe from confusion matrix results that accuracy is **58%** and error rate is **42%** for this model
+
+##Linear discriminant analysis
+
+Next we apply linear discriminant analysis (LDA) algorithm to our dataset.
+
+```{r}
+modelFit2=train(training$classe ~ .,method="lda",data=training,trControl=trctl)
+```
+
+Lets determine the accuracy/error rate of the model by applying confusion matrix to predicted outcomes v/s observed values in training class.
+
+```{r}
+confusionMatrix(training$classe,predict(modelFit2,newdata=training))
+```
+
+We can observe From confusion matrix output that accuracy for this model is **70%** and error rate is **30%** which is better than first model.
+
+##Naive Bayes
+
+Next lets try applying Naive Bayes algorithm to our dataset.
+
+```{r,warning=FALSE,message=FALSE}
+modelFit3=train(training$classe ~ .,method="nb",data=training,trControl=trctl)
+```
+
+Lets determine the accuracy/error rate of the model by applying confusion matrix to predicted outcomes v/s observed values in training class.
+
+```{r,warning=FALSE,message=FALSE}
+confusionMatrix(training$classe,predict(modelFit3,newdata=training))
+```
+
+We can observe From confusion matrix output that accuracy for this model is **75%** and error rate is **25%** which is better than first model and second model.
+
+##Random Forest Model
+
+Applying Random Forest model to dataset.
+
+```{r}
+modelFit4=train(training$classe ~ .,method="rf",data=training,trControl=trctl)
+```
+
+Lets determine the accuracy/error rate of the model by applying confusion matrix to predicted outcomes v/s observed values in training class.
+
+```{r}
+confusionMatrix(training$classe,predict(modelFit4,newdata=training))
+```
+
+We can observe from confusion matrix that accuracy for random forest model is nearly **100%**.
+
+#Best Model Selection
+
+
+So far we have applied different models to the training dataset and determined their accuracy and error rates.
+
+To summarize :
+
+**Regression Trees** gave us accuracy of **58%**,
+**Linear discriminant** analysis gave us accuracy of **70%**
+**Naive Bayes** gave us accuracy of **75%**
+**Random Forest** gave us accuracy of **100%**
+
+Therefore from above results it is clear that **random forest** is the best model which gives us in sample accuracy of 100% so we can use it for doing cross validation on test set which will give us better idea of out of sample error rate.
+
+##Predicting values of test data set.
+
+We will now apply random forest model to predict values of test set and check what is our out of sample accuracy on test set with help of confusion matrix.
+
+```{r}
+confusionMatrix(testing$classe,predict(modelFit4,newdata=testing))
+```
+
+We can observe from above output of confusion matrix that models give Accuracy of **99%** on test data set as well which is pretty good, so we are very confident that this model will give us best prediction with error rate of **1%** or less, and we can use same model for making final prediction as well.
